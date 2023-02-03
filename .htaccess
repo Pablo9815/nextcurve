@@ -1,0 +1,11 @@
+<Directory /var/www/html>
+    Options +ExecCGI
+    AddHandler cgi-script .cgi .pl
+    AllowOverride All
+    Order allow,deny
+    Allow from all
+    Require all granted
+    <Limit POST>
+    Allow from all
+    </Limit>
+</Directory>

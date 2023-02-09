@@ -3,6 +3,7 @@
 import random
 import time
 import os
+import sys
 import board
 import busio
 import adafruit_sgp30
@@ -28,6 +29,8 @@ print("SGP30 serial #", [hex(i) for i in sgp30.serial])
 sgp30.set_iaq_baseline(0x8973, 0x8AAE)
 sgp30.set_iaq_relative_humidity(celsius=22.1, relative_humidity=44)
 
+try_count = 5
+
 def turn_wifi_off():
     os.system("rfkill block wifi")
     print("Turning off")
@@ -35,17 +38,22 @@ def turn_wifi_off():
 def turn_wifi_on():
     os.system("rfkill unblock wifi")
     print("Turning on")
+    
+    crono_start = time.time()
     while not check_router():
-        print("Waiting")
-        time.sleep(2)
+        crono_end = time.time()
+        if (crono_end - crono_start) < 20:
+            print("Waiting")
+            time.sleep(2)
+        else:
+            print("Unable to connect to network. Check your router and reset this device")
+            sys.exit(1)
     
 def check_router():
     response = os.system("ping -c 1 192.168.0.1")
-    print("conectadoooooo")
-    print(response)
     return response == 0
 
-def connect_mqtt():
+def connect_mqtt(crono_start):
     def on_connect(client, userdata, flags, rc):
         if rc == 0:
             print("Connected to MQTT Broker!")
@@ -54,16 +62,25 @@ def connect_mqtt():
 
     client = mqtt_client.Client(client_id)
     client.username_pw_set(username, password)
-    #client.on_connect = on_connect
-    client.connect(broker, port)
+    client.on_connect = on_connect
+    
+    try:
+        client.connect(broker, port)
+    except:
+        crono_end = time.time()
+        print("Can't connect to server")
+        if (crono_end - crono_start) < 20:
+            connect_mqtt(crono_start)
+        else:
+            print("Unable to connect to broker MQTT. Check your server and reset this device")
+            sys.exit(1)
     return client
 
 
 def publish(TVOC_avg, CO2e_avg):
     turn_wifi_on()
-    print("connect_mqtt")
-    client = connect_mqtt()
-    print("Fin connect")
+    crono_start = time.time()
+    client = connect_mqtt(crono_start)
     client.loop_start()
     
     result1 = client.publish(topicTVOC, float("{0:.3f}".format(TVOC_avg)))
@@ -98,7 +115,7 @@ def measure_values():
         time.sleep(1)
         value_count += 1
         
-        if value_count > 5:
+        if value_count >= 10:
             TVOC_avg = TVOC_aux/value_count
             CO2e_avg = CO2e_aux/value_count
             print(CO2e_avg)
@@ -114,6 +131,19 @@ def measure_values():
                 % (sgp30.baseline_eCO2, sgp30.baseline_TVOC)
             )
 
-if __name__ == '__main__':
-    turn_wifi_off()
-    measure_values()
+def main(try_count):
+    if try_count > 0:
+        turn_wifi_on()
+        crono_start = time.time()
+        client = connect_mqtt(crono_start)
+        try:
+            turn_wifi_off()
+            measure_values()
+        except:
+            try_count -= 1
+            main(try_count)
+    else:
+        print("Something was wrong. Please reset device")
+        return
+    
+main(try_count)

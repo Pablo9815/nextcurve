@@ -23,5 +23,5 @@
   file_put_contents("/etc/wpa_supplicant/wpa_supplicant.conf", $config);
   
   // Esperar 5 segundos y luego reiniciar la Raspberry Pi
-  shell_exec('sudo python3 /home/pablonc/Documentos/finishfile.py');
+  shell_exec('sudo python3 /home/pablonc/Documentos/finish.py');
 ?>

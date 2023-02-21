@@ -46,4 +46,3 @@ sudo crontab -e
 #########PARA CLONAR SD
 
 https://www.thefastcode.com/es-eur/article/how-to-clone-your-raspberry-pi-sd-card-for-foolproof-backup
-

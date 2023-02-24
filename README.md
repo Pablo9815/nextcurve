@@ -37,7 +37,7 @@ Activar interfaz I2C
 (Ubuntu Server) https://raspberrypi.stackexchange.com/posts/109427/edit
 
 sudo crontab -e
-@reboot sleep 60 && python /home/pablonc/Documentos/script.py
+@reboot sleep 30 && python /home/pablonc/Documentos/script.py
 
 #########PARA CLONAR SD
 https://www.thefastcode.com/es-eur/article/how-to-clone-your-raspberry-pi-sd-card-for-foolproof-backup

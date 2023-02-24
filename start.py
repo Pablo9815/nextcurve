@@ -11,13 +11,9 @@ GPIO.setup(15, GPIO.OUT)
 def hostpot():
     GPIO.output(15, GPIO.LOW)
     print("Activando hostpot")
-    os.system("sudo cp /etc/dhcpcdhost.conf /etc/dhcpcd.conf")
-    os.system("sudo service dhcpcd restart")
-    os.system("sudo systemctl unmask hostapd")
-    os.system("sudo systemctl enable hostapd")
-    os.system("sudo systemctl start hostapd")
-    os.system("sudo service dnsmasq start")
-    os.system("sudo chmod 0777 /etc/wpa_supplicant/wpa_supplicant.conf")
+    os.system("sudo cp /etc/cloud/cloud.cfg.d/files/99-disable-network-config-host.cfg /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg")
+    os.system("sudo cp /etc/netplan/files/10-my-config-host.yaml /etc/netplan/10-my-config.yaml")
+    os.system("sudo netplan apply")
     
     GPIO.output(13, GPIO.HIGH)
 

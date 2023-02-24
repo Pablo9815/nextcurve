@@ -14,6 +14,7 @@ def hostpot():
     os.system("sudo cp /etc/cloud/cloud.cfg.d/files/99-disable-network-config-host.cfg /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg")
     os.system("sudo cp /etc/netplan/files/10-my-config-host.yaml /etc/netplan/10-my-config.yaml")
     os.system("sudo netplan apply")
+    os.system("sudo chmod 0777 /etc/netplan/50-cloud-init.yaml")
     
     GPIO.output(13, GPIO.HIGH)
 

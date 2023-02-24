@@ -17,12 +17,12 @@
         renderer: networkd
         wlan0:
             access-points:
-                " . "\"" . $ssid . "\"" . "
+                " . "\"" . $ssid . "\"" . ":
                     password: " . "\"" . $password . "\"" . "
             dhcp4: true
             optional: true";
   file_put_contents("/etc/netplan/50-cloud-init.yaml", $config);
   
   // Esperar 5 segundos y luego reiniciar la Raspberry Pi
-  shell_exec('sudo python3 /home/pablonc/Documentos/finish.py');
+  //shell_exec('sudo python3 /home/pablonc/Documentos/finish.py');
 ?>

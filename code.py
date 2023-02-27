@@ -182,7 +182,7 @@ def sgp30code(try_count):
             try_count = 5
         except:
             try_count -= 1
-            main(try_count)
+            sgp30code(try_count)
     else:
         print("Something was wrong. Please reset device")
         sys.exit(1)

@@ -7,6 +7,7 @@ GPIO.setmode(GPIO.BOARD)
 GPIO.setup(11, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 GPIO.setup(13, GPIO.OUT)
 GPIO.setup(15, GPIO.OUT)
+task1 = True
 
 def hostpot():
     GPIO.output(15, GPIO.LOW)
@@ -20,6 +21,8 @@ def hostpot():
     GPIO.output(13, GPIO.HIGH)
 
 def callback(channel):
+    global task1
+    task1 = False
     hostpot()
 
 def shutdown():
@@ -33,19 +36,20 @@ def check_router():
 GPIO.add_event_detect(11, GPIO.FALLING, callback=callback, bouncetime=500)
 
 def main():
-    GPIO.output(13, GPIO.LOW)
-    GPIO.output(15, GPIO.HIGH)
-    os.system("rfkill unblock wifi")
-    os.system("sudo pkill finish.py")
-    os.system("sudo rm /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg")
-    os.system("sudo rm /etc/netplan/10-my-config.yaml")
-    os.system("sudo netplan apply")
-    while not check_router():
-        GPIO.output(15, GPIO.LOW)
-        time.sleep(1)
+    while task1:
+        GPIO.output(13, GPIO.LOW)
         GPIO.output(15, GPIO.HIGH)
-        time.sleep(1)
-    print("Ejecutando script")
-    os.system("sudo python3 /home/pablonc/Documentos/sgp30code.py")
+        os.system("rfkill unblock wifi")
+        os.system("sudo pkill finish.py")
+        os.system("sudo rm /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg")
+        os.system("sudo rm /etc/netplan/10-my-config.yaml")
+        os.system("sudo netplan apply")
+        while not check_router():
+            GPIO.output(15, GPIO.LOW)
+            time.sleep(1)
+            GPIO.output(15, GPIO.HIGH)
+            time.sleep(1)
+        print("Ejecutando script")
+        os.system("sudo python3 /home/pablonc/Documentos/sgp30code.py")
     
 main()

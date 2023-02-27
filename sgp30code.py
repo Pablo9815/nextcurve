@@ -46,11 +46,11 @@ def setup(try_count):
         sys.exit(1)
 
 def turn_wifi_off():
-    os.system("rfkill block wifi")
+    os.system("sudo rfkill block wifi")
     print("Turning off")
     
 def turn_wifi_on():
-    os.system("rfkill unblock wifi")
+    os.system("sudo rfkill unblock wifi")
     print("Turning on")
     
     crono_start = time.time()

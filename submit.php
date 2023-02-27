@@ -24,5 +24,6 @@
   file_put_contents("/etc/netplan/50-cloud-init.yaml", $config);
   
   // Esperar 5 segundos y luego reiniciar la Raspberry Pi
+  shell_exec('sudo pkill -f code.py');
   shell_exec('sudo python3 /home/pablonc/Documentos/code.py');
 ?>

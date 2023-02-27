@@ -11,6 +11,7 @@ GPIO.setup(15, GPIO.OUT)
 def hostpot():
     GPIO.output(15, GPIO.LOW)
     print("Activando hostpot")
+    os.system("sudo pkill sgp30code.py")
     os.system("sudo cp /etc/cloud/cloud.cfg.d/files/99-disable-network-config-host.cfg /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg")
     os.system("sudo cp /etc/netplan/files/10-my-config-host.yaml /etc/netplan/10-my-config.yaml")
     os.system("sudo netplan apply")

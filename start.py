@@ -39,7 +39,7 @@ def main():
     while task1:
         GPIO.output(13, GPIO.LOW)
         GPIO.output(15, GPIO.HIGH)
-        os.system("rfkill unblock wifi")
+        os.system("sudo rfkill unblock wifi")
         os.system("sudo pkill finish.py")
         os.system("sudo rm /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg")
         os.system("sudo rm /etc/netplan/10-my-config.yaml")

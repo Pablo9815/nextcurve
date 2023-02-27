@@ -45,10 +45,12 @@ def main():
         os.system("sudo rm /etc/netplan/10-my-config.yaml")
         os.system("sudo netplan apply")
         while not check_router():
-            GPIO.output(15, GPIO.LOW)
-            time.sleep(1)
-            GPIO.output(15, GPIO.HIGH)
-            time.sleep(1)
+            crono_start = time.time()
+            while (time.time() - crono_start) <= 6:
+                GPIO.output(15, GPIO.LOW)
+                time.sleep(0.5)
+                GPIO.output(15, GPIO.HIGH)
+                time.sleep(0.5)
         print("Ejecutando script")
         os.system("sudo python3 /home/pablonc/Documentos/sgp30code.py")
     

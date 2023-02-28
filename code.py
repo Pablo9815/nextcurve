@@ -15,7 +15,6 @@ GPIO.setmode(GPIO.BCM)
 GPIO.setup(17, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 GPIO.setup(27, GPIO.OUT)
 GPIO.setup(22, GPIO.OUT)
-task1 = False
 
 try_count = 5
 broker = '192.168.0.4'

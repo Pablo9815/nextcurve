@@ -1,13 +1,3 @@
-<html>
-  <head>
-    <title>Configuración de red WiFi</title>
-  </head>
-  <body>
-    <h1>Configuración de red WiFi</h1>
-    <p>La configuración se ha guardado con éxito. El dispositivo se reiniciará en unos segundos.</p>
-  </body>
-</html>
-
 <?php
   $ssid = $_POST["ssid"];
   $password = $_POST["password"];
@@ -25,3 +15,14 @@
  
   shell_exec('sudo python3 /home/pablonc/Documentos/code.py');
 ?>
+
+<html>
+  <head>
+    <title>Configuracion de red WiFi</title>
+  </head>
+  <body>
+    <h1>Configuracion de red WiFi</h1>
+    <p>La configuracion se ha guardado con exito. El dispositivo se reiniciara en unos segundos.</p>
+  </body>
+</html>
+

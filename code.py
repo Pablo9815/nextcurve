@@ -8,6 +8,7 @@ import RPi.GPIO as GPIO
 import board
 import busio
 import adafruit_sgp30
+import adafruit_dht
 from paho.mqtt import client as mqtt_client
 
 GPIO.setwarnings(False)
@@ -30,6 +31,7 @@ def setup(try_count):
     print(".")
     if try_count > 0:
         try:
+            dhtDevice = adafruit_dht.DHT22(board.D4)
             i2c = busio.I2C(board.SCL, board.SDA, frequency=100000)
 
             # Create library object on our I2C port
@@ -37,9 +39,6 @@ def setup(try_count):
             sgp30 = adafruit_sgp30.Adafruit_SGP30(i2c)
 
             print("SGP30 serial #", [hex(i) for i in sgp30.serial])
-
-            #sgp30.set_iaq_baseline(0x8973, 0x8AAE)
-            sgp30.set_iaq_relative_humidity(celsius=22.1, relative_humidity=44)
 
             try_count = 5
         except:
@@ -142,6 +141,22 @@ def measure_values():
     CO2e_aux = 0
     while True:
         print("Midiendo")
+        DHTread = True
+        DHTcount = 0
+        if DHTcount < 10:
+            while DHTread:
+                try:
+                    temp = dhtDevice.temperature
+                    hum = dhtDevice.humidity
+                    sgp30.set_iaq_relative_humidity(celsius=temp, relative_humidity=hum)
+                    DHTread = False
+                    DHTcount = 0
+                except:
+                    time.sleep(1)
+                    DHTcount += 1
+                    continue
+        sgp30.set_iaq_baseline(0x9636, 0x95C0) #CALIBRAR PARA CADA SENSOR SGP30
+
         TVOC = sgp30.TVOC
         CO2e = sgp30.eCO2
 

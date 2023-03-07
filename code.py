@@ -31,6 +31,7 @@ def setup(try_count):
     print(".")
     if try_count > 0:
         try:
+            global dhtDevice
             dhtDevice = adafruit_dht.DHT22(board.D4)
             i2c = busio.I2C(board.SCL, board.SDA, frequency=100000)
 

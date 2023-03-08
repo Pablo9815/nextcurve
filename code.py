@@ -144,14 +144,18 @@ def measure_values():
         print("Midiendo")
         DHTread = True
         DHTcount = 0
-        if DHTcount < 10:
-            while DHTread:
+        while DHTread:
+            if DHTcount < 20:
                 try:
                     temp = dhtDevice.temperature
                     hum = dhtDevice.humidity
-                    sgp30.set_iaq_relative_humidity(celsius=temp, relative_humidity=hum)
-                    DHTread = False
-                    DHTcount = 0
+                    if temp is not None or hum is not None:
+                        sgp30.set_iaq_relative_humidity(celsius=temp, relative_humidity=hum)
+                        DHTread = False
+                        DHTcount = 0
+                    else:
+                        time.sleep(0.5)
+                        DHTcount += 1
                 except:
                     time.sleep(1)
                     DHTcount += 1

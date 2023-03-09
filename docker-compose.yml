@@ -1,0 +1,15 @@
+version: '3'
+services:
+  mosquitto:
+    hostname: mosquitto
+    image: eclipse-mosquitto: 1.6
+    container_name: mosquitto-mqttt
+    restart: always
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - ./mosquitto.passwd:/mosquitto/config/mosquitto.passwd
+      #- //c/mqttt/mosquitto.log:/mosquitto/log/mosquitto.log
+      #- //c/mqttt/data:/mosquitto/data
+    ports:
+      - "1883:1883"
+      - "9001:9001"

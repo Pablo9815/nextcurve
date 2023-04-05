@@ -41,10 +41,33 @@ int value = 0;
 Preferences myPrefs;
 int counter = 0;
 
+TaskHandle_t Task1;
+
+static unsigned long lastTime = 0;
+
+// Definimos los pines del ESP32 que se utilizarán para controlar el LED RGB
+const int redPin = 15;
+const int greenPin = 2;
+const int bluePin = 4;
+const int buzzerPin = 5;
+
 //*****************************************************************************************//
 void setup() {
   Serial.begin(115200);                                           // Initialize serial communications with the PC
   SPI.begin();                                                  // Init SPI bus
+  
+  // Configuramos los pines como salidas
+  pinMode(redPin, OUTPUT);
+  pinMode(greenPin, OUTPUT);
+  pinMode(bluePin, OUTPUT);
+  pinMode(buzzerPin, OUTPUT);
+
+  // Apagamos todos los LEDs al iniciar el programa
+  digitalWrite(redPin, LOW);
+  digitalWrite(greenPin, HIGH);
+  digitalWrite(bluePin, HIGH);
+  digitalWrite(buzzerPin, LOW);
+  
   mfrc522.PCD_Init();                                              // Init MFRC522 card
   Serial.println(F("Read personal data on a MIFARE PICC:"));    //shows in serial that it is ready to read
   setup_wifi();
@@ -53,14 +76,65 @@ void setup() {
   
   // Configuración del objeto NTPClient
   timeClient.begin();
+
+  if (!client.connected()) {
+    reconnect();
+  }
+
+  client.loop();
+  client.publish("esp32/check", "ON");
+  
+  xTaskCreatePinnedToCore(
+                    Task1code,   /* Task function. */
+                    "Task1",     /* name of task. */
+                    2000,       /* Stack size of task */
+                    NULL,        /* parameter of the task */
+                    0,           /* priority of the task */
+                    &Task1,      /* Task handle to keep track of created task */
+                    0);          /* pin task to core 0 */
+  delay(500);
+}
+
+void Task1code( void * pvParameters ){
+  for(;;){
+    Serial.print("Task1 running on core ");
+    Serial.println(xPortGetCoreID());
+  
+    if (WiFi.status() != WL_CONNECTED) {
+      setup_wifi();
+    }
+    if (!client.connected()) {
+      reconnect();
+    }
+    
+    delay(1000);
+  }
 }
 
 //*****************************************************************************************//
 void loop() {
-  
+  Serial.print("TaskLoop running on core ");
+  Serial.println(xPortGetCoreID());
+
   if (!client.connected()) {
+    digitalWrite(redPin, LOW);
+    digitalWrite(greenPin, HIGH);
+    digitalWrite(bluePin, HIGH);
+    } else {
+      digitalWrite(redPin, HIGH);
+      digitalWrite(greenPin, LOW);
+      digitalWrite(bluePin, HIGH);
+      }
+      
+  if (millis() - lastTime >= 5000) { // Si han pasado 5 minutos desde la última ejecución
+      lastTime = millis(); // Actualiza el tiempo de la última ejecución
+      client.loop();
+      client.publish("esp32/check", "ON");
+    }
+  
+  /*if (!client.connected()) {
     reconnect();
-  }
+  }*/
   client.loop();
   client.publish("esp32/reset", "False");
   
@@ -70,10 +144,22 @@ void loop() {
 
   MFRC522::StatusCode status;
 
+  if (client.connected() && WiFi.status() == WL_CONNECTED && counter != 0) {
+      publish_data();
+    }
+
+  /*if (!mfrc522.PCD_PerformSelfTest()) {
+    SPI.begin();
+    mfrc522.PCD_Init();
+    }*/
   // Reset the loop if no new card present on the sensor/reader. This saves the entire process when idle.
   if ( ! mfrc522.PICC_IsNewCardPresent()) {
     return;
   }
+
+  digitalWrite(redPin, HIGH);
+  digitalWrite(greenPin, HIGH);
+  digitalWrite(bluePin, HIGH);
 
   // Select one of the cards
   if ( ! mfrc522.PICC_ReadCardSerial()) {
@@ -114,31 +200,32 @@ void obtain_data(byte *buffer, byte bufferSize) {
 
 
     save_data(bufferTimepub, output);
-    
-    if (WiFi.status() == WL_CONNECTED) {
-      publish_data(bufferTimepub, output);
-    }
-    
 }
 
-void publish_data(char* sampleTime, char* ID) {
+void publish_data() {
+  Serial.println("!!!!!!!!!!! Publicando datos !!!!!!!!!!!!!!");
   for (int i = 0; i < counter; i += 2) {
     String dirTimeSaved = String(i);
     String dirIDSaved = String(i+1);
     String sampleTimeSaved = myPrefs.getString(dirTimeSaved.c_str(), "");
     String IDSaved = myPrefs.getString(dirIDSaved.c_str(), "");
-    sampleTime = strdup(sampleTimeSaved.c_str());
-    ID = strdup(IDSaved.c_str());
+    char* sampleTime = strdup(sampleTimeSaved.c_str());
+    char* ID = strdup(IDSaved.c_str());
     
     client.publish("esp32/time", sampleTime);
     client.publish("esp32/location", location);
     client.publish("esp32/id_read", ID);
+    Serial.print(sampleTime);
+    Serial.print("  ");
+    Serial.println(ID);
+    delay(1100);
   }
   myPrefs.end();
   counter = 0;
 }
 
 void save_data(char* sampleTime, char* ID) {
+  Serial.println("########## Salvando datos #################");
   myPrefs.begin("Storage", false);
   
   String direccionTime = String(counter);                                 //Address for saving measurement data. Position n*(ContToPublish+1)
@@ -147,6 +234,14 @@ void save_data(char* sampleTime, char* ID) {
   myPrefs.putString(direccionTime.c_str(), sampleTime);                  //Save data in flash memory
   myPrefs.putString(direccionID.c_str(), ID);
   counter += 2;
+
+  delay(500);
+  digitalWrite(redPin, HIGH);
+  digitalWrite(greenPin, LOW);
+  digitalWrite(bluePin, HIGH);
+  digitalWrite(buzzerPin, HIGH);
+  delay(500);
+  digitalWrite(buzzerPin, LOW);
 }
 
 void setup_wifi() {
@@ -159,8 +254,15 @@ void setup_wifi() {
   WiFi.begin(ssid, password);
 
   while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
+    digitalWrite(redPin, HIGH);
+    digitalWrite(greenPin, HIGH);
+    digitalWrite(bluePin, LOW);
+    delay(250);
     Serial.print(".");
+    digitalWrite(redPin, HIGH);
+    digitalWrite(greenPin, HIGH);
+    digitalWrite(bluePin, HIGH);
+    delay(250);
   }
   
   Serial.println("");
@@ -210,6 +312,11 @@ void callback(char* topic, byte* message, unsigned int length) {
 void reconnect() {
   // Loop until we're reconnected
   while (!client.connected()) {
+    
+    digitalWrite(redPin, LOW);
+    digitalWrite(greenPin, HIGH);
+    digitalWrite(bluePin, HIGH);
+    
     Serial.print("Attempting MQTT connection...");
     // Attempt to connect
     if (client.connect("ESP8266Client", "admin", "admin")) {
@@ -219,9 +326,9 @@ void reconnect() {
     } else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
-      Serial.println(" try again in 5 seconds");
+      Serial.println(" try again in 0.5 seconds");
       // Wait 5 seconds before retrying
-      delay(5000);
+      delay(500);
     }
   }
 }

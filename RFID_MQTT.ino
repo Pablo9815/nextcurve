@@ -7,11 +7,14 @@
 #include <NTPClient.h>
 #include <Preferences.h>
 #include <TimeLib.h>
+#include <esp_task_wdt.h>
+#include "RTClib.h"
+
 
 #define location  "room_1"
 
-#define RST_PIN         22           // Configurable, see typical pin layout above
-#define SS_PIN          21          // Configurable, see typical pin layout above
+#define RST_PIN         5           // Configurable, see typical pin layout above
+#define SS_PIN          14          // Configurable, see typical pin layout above
 
 MFRC522 mfrc522(SS_PIN, RST_PIN);   // Create MFRC522 instance
 
@@ -28,7 +31,7 @@ const int ntpPort = 123;
 
 // Zona horaria de Orlando, Florida
 const int timeZoneOffset = -5; // UTC-5
-
+RTC_DS3231 rtc;
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, ntpServer, timeZoneOffset * 3600, 60000);
 
@@ -39,23 +42,31 @@ char msg[50];
 int value = 0;
 
 Preferences myPrefs;
-int counter = 0;
+int counter;
+
+int reset_bool;
+int read_bool;
 
 TaskHandle_t Task1;
 
 static unsigned long lastTime = 0;
 
+#define WDT_TIMEOUT 6
+
 // Definimos los pines del ESP32 que se utilizarán para controlar el LED RGB
 const int redPin = 15;
 const int greenPin = 2;
 const int bluePin = 4;
-const int buzzerPin = 5;
+const int buzzerPin = 12;
 
 //*****************************************************************************************//
 void setup() {
   Serial.begin(115200);                                           // Initialize serial communications with the PC
   SPI.begin();                                                  // Init SPI bus
-  
+  rtc.begin();
+
+  //rtc.adjust(DateTime(1998, 11, 27, 14, 12, 0));
+   
   // Configuramos los pines como salidas
   pinMode(redPin, OUTPUT);
   pinMode(greenPin, OUTPUT);
@@ -69,42 +80,33 @@ void setup() {
   digitalWrite(buzzerPin, LOW);
   
   mfrc522.PCD_Init();                                              // Init MFRC522 card
-  Serial.println(F("Read personal data on a MIFARE PICC:"));    //shows in serial that it is ready to read
-  setup_wifi();
-  client.setServer(mqtt_server, 1883);
-  client.setCallback(callback);
-  
-  // Configuración del objeto NTPClient
-  timeClient.begin();
 
-  if (!client.connected()) {
-    reconnect();
-  }
-
-  client.loop();
-  client.publish("esp32/check", "ON");
+  myPrefs.begin("Storage", false);
+  counter = myPrefs.getInt("counter",0);
   
-  xTaskCreatePinnedToCore(
-                    Task1code,   /* Task function. */
-                    "Task1",     /* name of task. */
-                    2000,       /* Stack size of task */
-                    NULL,        /* parameter of the task */
-                    0,           /* priority of the task */
-                    &Task1,      /* Task handle to keep track of created task */
-                    0);          /* pin task to core 0 */
+  xTaskCreatePinnedToCore(Task1code, "Task1", 8192, NULL, 0, &Task1, 0);
+  
   delay(500);
+  Serial.println("Fin SetUp");
 }
 
 void Task1code( void * pvParameters ){
   for(;;){
-    Serial.print("Task1 running on core ");
-    Serial.println(xPortGetCoreID());
-  
     if (WiFi.status() != WL_CONNECTED) {
+      Serial.println("1");
       setup_wifi();
     }
+    
+    client.setServer(mqtt_server, 1883);
+    client.setCallback(callback);
+    
+    timeClient.begin();
+  
     if (!client.connected()) {
+      Serial.println("2");
       reconnect();
+      client.loop();
+      client.publish("esp32/check", "ON");
     }
     
     delay(1000);
@@ -113,9 +115,7 @@ void Task1code( void * pvParameters ){
 
 //*****************************************************************************************//
 void loop() {
-  Serial.print("TaskLoop running on core ");
-  Serial.println(xPortGetCoreID());
-
+  read_bool = 0;
   if (!client.connected()) {
     digitalWrite(redPin, LOW);
     digitalWrite(greenPin, HIGH);
@@ -126,15 +126,14 @@ void loop() {
       digitalWrite(bluePin, HIGH);
       }
       
-  if (millis() - lastTime >= 5000) { // Si han pasado 5 minutos desde la última ejecución
+  if (millis() - lastTime >= 5000) {
+      Serial.println("OOOOOOOOOO Check ON OOOOOOOOOO");
+    
       lastTime = millis(); // Actualiza el tiempo de la última ejecución
-      client.loop();
+      //client.loop();
       client.publish("esp32/check", "ON");
     }
   
-  /*if (!client.connected()) {
-    reconnect();
-  }*/
   client.loop();
   client.publish("esp32/reset", "False");
   
@@ -148,25 +147,34 @@ void loop() {
       publish_data();
     }
 
-  /*if (!mfrc522.PCD_PerformSelfTest()) {
-    SPI.begin();
-    mfrc522.PCD_Init();
-    }*/
   // Reset the loop if no new card present on the sensor/reader. This saves the entire process when idle.
   if ( ! mfrc522.PICC_IsNewCardPresent()) {
     return;
   }
-
-  digitalWrite(redPin, HIGH);
-  digitalWrite(greenPin, HIGH);
-  digitalWrite(bluePin, HIGH);
-
+        
   // Select one of the cards
   if ( ! mfrc522.PICC_ReadCardSerial()) {
     return;
   }
 
+  read_bool = 1;
+  Serial.println(read_bool);
+  reset_bool = myPrefs.getInt("reset_bool", 0);
+  Serial.println(reset_bool);
+
+  if (reset_bool == 1 ){
+    reset_bool = 0;
+    read_bool = 0;
+    myPrefs.putInt("reset_bool", reset_bool);
+    Serial.println("if reset");
+    delay(10000);
+    return;
+    }
+  
   Serial.println(F("**Card Detected:**"));
+  digitalWrite(redPin, HIGH);
+  digitalWrite(greenPin, HIGH);
+  digitalWrite(bluePin, HIGH);
   
   obtain_data(mfrc522.uid.uidByte, mfrc522.uid.size);
   
@@ -186,24 +194,36 @@ void obtain_data(byte *buffer, byte bufferSize) {
         sprintf(output + strlen(output), "%s%02X", i == 0 ? "" : "", buffer[i]); // Se concatena cada elemento del buffer a la variable char
     }
 
-    
     // Actualización del objeto NTPClient si hay conexión a Internet
     if (WiFi.status() == WL_CONNECTED) {
       Serial.println("Sincronizando hora con servidor NTP...");
       timeClient.update();
-      setTime(timeClient.getEpochTime());
+      rtc.adjust(DateTime(timeClient.getEpochTime()));
     }
-    // Obtención de la hora actual y formateo
-    String formattedTime = timeToString(now());
-    char bufferTimepub[20];
-    formattedTime.toCharArray(bufferTimepub, 20);
+    
+    DateTime now = rtc.now();
+    String datetimeStr = String(now.year(), DEC) + "-" +
+                         twoDigits(now.month()) + "-" +
+                         twoDigits(now.day()) + " " +
+                         twoDigits(now.hour()) + ":" +
+                         twoDigits(now.minute()) + ":" +
+                         twoDigits(now.second());
+                         
+    char datetimeChar[20];
+    datetimeStr.toCharArray(datetimeChar, 20);
+    save_data(datetimeChar, output);
+}
 
-
-    save_data(bufferTimepub, output);
+String twoDigits(int n) {
+  if (n < 10) {
+    return "0" + String(n);
+  }
+  return String(n);
 }
 
 void publish_data() {
   Serial.println("!!!!!!!!!!! Publicando datos !!!!!!!!!!!!!!");
+  myPrefs.begin("Storage", false);
   for (int i = 0; i < counter; i += 2) {
     String dirTimeSaved = String(i);
     String dirIDSaved = String(i+1);
@@ -220,8 +240,9 @@ void publish_data() {
     Serial.println(ID);
     delay(1100);
   }
-  myPrefs.end();
   counter = 0;
+  myPrefs.putInt("counter", counter);
+  myPrefs.end();
 }
 
 void save_data(char* sampleTime, char* ID) {
@@ -234,7 +255,9 @@ void save_data(char* sampleTime, char* ID) {
   myPrefs.putString(direccionTime.c_str(), sampleTime);                  //Save data in flash memory
   myPrefs.putString(direccionID.c_str(), ID);
   counter += 2;
-
+  myPrefs.putInt("counter", counter);
+  myPrefs.end();
+  
   delay(500);
   digitalWrite(redPin, HIGH);
   digitalWrite(greenPin, LOW);
@@ -246,6 +269,7 @@ void save_data(char* sampleTime, char* ID) {
 
 void setup_wifi() {
   delay(10);
+  int wifi_counter = 0;
   // We start by connecting to a WiFi network
   Serial.println();
   Serial.print("Connecting to ");
@@ -254,15 +278,31 @@ void setup_wifi() {
   WiFi.begin(ssid, password);
 
   while (WiFi.status() != WL_CONNECTED) {
-    digitalWrite(redPin, HIGH);
-    digitalWrite(greenPin, HIGH);
-    digitalWrite(bluePin, LOW);
-    delay(250);
-    Serial.print(".");
-    digitalWrite(redPin, HIGH);
-    digitalWrite(greenPin, HIGH);
-    digitalWrite(bluePin, HIGH);
-    delay(250);
+    if (wifi_counter < 30) {
+      digitalWrite(redPin, HIGH);
+      digitalWrite(greenPin, HIGH);
+      digitalWrite(bluePin, LOW);
+      delay(250);
+      Serial.print(".");
+      digitalWrite(redPin, HIGH);
+      digitalWrite(greenPin, HIGH);
+      digitalWrite(bluePin, HIGH);
+      delay(250);
+      wifi_counter += 1;
+      } else {
+        if (read_bool == 1) {
+          myPrefs.begin("Storage", false);
+          reset_bool = 1;
+          myPrefs.putInt("reset_bool", reset_bool);
+          myPrefs.end();
+        } else {
+          myPrefs.begin("Storage", false);
+          reset_bool = 0;
+          myPrefs.putInt("reset_bool", reset_bool);
+          myPrefs.end();
+          }
+        ESP.restart();
+      }
   }
   
   Serial.println("");
@@ -312,7 +352,7 @@ void callback(char* topic, byte* message, unsigned int length) {
 void reconnect() {
   // Loop until we're reconnected
   while (!client.connected()) {
-    
+    Serial.println("3");
     digitalWrite(redPin, LOW);
     digitalWrite(greenPin, HIGH);
     digitalWrite(bluePin, HIGH);

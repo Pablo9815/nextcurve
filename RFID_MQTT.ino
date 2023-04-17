@@ -7,7 +7,6 @@
 #include <NTPClient.h>
 #include <Preferences.h>
 #include <TimeLib.h>
-#include <esp_task_wdt.h>
 #include "RTClib.h"
 
 
@@ -51,7 +50,6 @@ TaskHandle_t Task1;
 
 static unsigned long lastTime = 0;
 
-#define WDT_TIMEOUT 6
 
 // Definimos los pines del ESP32 que se utilizarán para controlar el LED RGB
 const int redPin = 15;
@@ -68,16 +66,10 @@ void setup() {
   //rtc.adjust(DateTime(1998, 11, 27, 14, 12, 0));
    
   // Configuramos los pines como salidas
-  pinMode(redPin, OUTPUT);
-  pinMode(greenPin, OUTPUT);
-  pinMode(bluePin, OUTPUT);
-  pinMode(buzzerPin, OUTPUT);
+  pinMode(redPin, OUTPUT); pinMode(greenPin, OUTPUT); pinMode(bluePin, OUTPUT); pinMode(buzzerPin, OUTPUT);
 
   // Apagamos todos los LEDs al iniciar el programa
-  digitalWrite(redPin, LOW);
-  digitalWrite(greenPin, HIGH);
-  digitalWrite(bluePin, HIGH);
-  digitalWrite(buzzerPin, LOW);
+  digitalWrite(redPin, LOW); digitalWrite(greenPin, HIGH); digitalWrite(bluePin, HIGH); digitalWrite(buzzerPin, LOW);
   
   mfrc522.PCD_Init();                                              // Init MFRC522 card
 
@@ -117,13 +109,9 @@ void Task1code( void * pvParameters ){
 void loop() {
   read_bool = 0;
   if (!client.connected()) {
-    digitalWrite(redPin, LOW);
-    digitalWrite(greenPin, HIGH);
-    digitalWrite(bluePin, HIGH);
+    digitalWrite(redPin, LOW); digitalWrite(greenPin, HIGH); digitalWrite(bluePin, HIGH);
     } else {
-      digitalWrite(redPin, HIGH);
-      digitalWrite(greenPin, LOW);
-      digitalWrite(bluePin, HIGH);
+      digitalWrite(redPin, HIGH); digitalWrite(greenPin, LOW); digitalWrite(bluePin, HIGH);
       }
       
   if (millis() - lastTime >= 5000) {
@@ -147,6 +135,8 @@ void loop() {
       publish_data();
     }
 
+  Serial.print("Read bool: ");
+  Serial.println(read_bool);
   // Reset the loop if no new card present on the sensor/reader. This saves the entire process when idle.
   if ( ! mfrc522.PICC_IsNewCardPresent()) {
     return;
@@ -158,29 +148,17 @@ void loop() {
   }
 
   read_bool = 1;
+  Serial.print("Read bool: ");
   Serial.println(read_bool);
-  reset_bool = myPrefs.getInt("reset_bool", 0);
-  Serial.println(reset_bool);
-
-  if (reset_bool == 1 ){
-    reset_bool = 0;
-    read_bool = 0;
-    myPrefs.putInt("reset_bool", reset_bool);
-    Serial.println("if reset");
-    delay(10000);
-    return;
-    }
   
   Serial.println(F("**Card Detected:**"));
-  digitalWrite(redPin, HIGH);
-  digitalWrite(greenPin, HIGH);
-  digitalWrite(bluePin, HIGH);
+  digitalWrite(redPin, HIGH); digitalWrite(greenPin, HIGH); digitalWrite(bluePin, HIGH);
   
   obtain_data(mfrc522.uid.uidByte, mfrc522.uid.size);
   
   Serial.println(F("\n**End Reading**\n"));
 
-  delay(1000); //change value if you want to read cards faster
+  delay(5000); //change value if you want to read cards faster
 
   mfrc522.PICC_HaltA();
   mfrc522.PCD_StopCrypto1();
@@ -202,12 +180,7 @@ void obtain_data(byte *buffer, byte bufferSize) {
     }
     
     DateTime now = rtc.now();
-    String datetimeStr = String(now.year(), DEC) + "-" +
-                         twoDigits(now.month()) + "-" +
-                         twoDigits(now.day()) + " " +
-                         twoDigits(now.hour()) + ":" +
-                         twoDigits(now.minute()) + ":" +
-                         twoDigits(now.second());
+    String datetimeStr = String(now.year(), DEC) + "-" + twoDigits(now.month()) + "-" + twoDigits(now.day()) + " " + twoDigits(now.hour()) + ":" + twoDigits(now.minute()) + ":" + twoDigits(now.second());
                          
     char datetimeChar[20];
     datetimeStr.toCharArray(datetimeChar, 20);
@@ -235,9 +208,7 @@ void publish_data() {
     client.publish("esp32/time", sampleTime);
     client.publish("esp32/location", location);
     client.publish("esp32/id_read", ID);
-    Serial.print(sampleTime);
-    Serial.print("  ");
-    Serial.println(ID);
+    Serial.print(sampleTime); Serial.print("  "); Serial.println(ID);
     delay(1100);
   }
   counter = 0;
@@ -259,12 +230,14 @@ void save_data(char* sampleTime, char* ID) {
   myPrefs.end();
   
   delay(500);
-  digitalWrite(redPin, HIGH);
-  digitalWrite(greenPin, LOW);
-  digitalWrite(bluePin, HIGH);
+  digitalWrite(redPin, HIGH); digitalWrite(greenPin, LOW); digitalWrite(bluePin, HIGH); 
   digitalWrite(buzzerPin, HIGH);
   delay(500);
   digitalWrite(buzzerPin, LOW);
+
+  if (client.connected() && WiFi.status() == WL_CONNECTED) {
+      publish_data();
+  }
 }
 
 void setup_wifi() {
@@ -279,27 +252,15 @@ void setup_wifi() {
 
   while (WiFi.status() != WL_CONNECTED) {
     if (wifi_counter < 30) {
-      digitalWrite(redPin, HIGH);
-      digitalWrite(greenPin, HIGH);
-      digitalWrite(bluePin, LOW);
+      digitalWrite(redPin, HIGH); digitalWrite(greenPin, HIGH); digitalWrite(bluePin, LOW);
       delay(250);
       Serial.print(".");
-      digitalWrite(redPin, HIGH);
-      digitalWrite(greenPin, HIGH);
-      digitalWrite(bluePin, HIGH);
+      digitalWrite(redPin, HIGH); digitalWrite(greenPin, HIGH); digitalWrite(bluePin, HIGH);
       delay(250);
       wifi_counter += 1;
       } else {
         if (read_bool == 1) {
-          myPrefs.begin("Storage", false);
-          reset_bool = 1;
-          myPrefs.putInt("reset_bool", reset_bool);
-          myPrefs.end();
-        } else {
-          myPrefs.begin("Storage", false);
-          reset_bool = 0;
-          myPrefs.putInt("reset_bool", reset_bool);
-          myPrefs.end();
+          delay (10000);
           }
         ESP.restart();
       }
@@ -322,10 +283,6 @@ void callback(char* topic, byte* message, unsigned int length) {
     messageTemp += (char)message[i];
   }
   Serial.println();
-
-  // Feel free to add more if statements to control more GPIOs with MQTT
-
-  // If a message is received on the topic esp32/output, you check if the message is either "on" or "off". 
   // Changes the output state according to the message
   if (String(topic) == "esp32/output") {
     if(messageTemp == "state"){
@@ -333,7 +290,7 @@ void callback(char* topic, byte* message, unsigned int length) {
       if (!mfrc522.PCD_PerformSelfTest()) {
         Serial.println(F("Self test failed, possibly a connection issue or faulty module"));
         Serial.println("Error");
-      client.publish("esp32/state", "Error");
+        client.publish("esp32/state", "Error");
       }
       else {
         Serial.println("OK");
@@ -353,9 +310,7 @@ void reconnect() {
   // Loop until we're reconnected
   while (!client.connected()) {
     Serial.println("3");
-    digitalWrite(redPin, LOW);
-    digitalWrite(greenPin, HIGH);
-    digitalWrite(bluePin, HIGH);
+    digitalWrite(redPin, LOW); digitalWrite(greenPin, HIGH); digitalWrite(bluePin, HIGH);
     
     Serial.print("Attempting MQTT connection...");
     // Attempt to connect
@@ -371,10 +326,4 @@ void reconnect() {
       delay(500);
     }
   }
-}
-  
-String timeToString(time_t time) {
-  char bufferTime[20];
-  sprintf(bufferTime, "%02d:%02d:%02d %02d/%02d/%04d", hour(time), minute(time), second(time), day(time), month(time), year(time));
-  return String(bufferTime);
 }
